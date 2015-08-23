@@ -1,0 +1,81 @@
+---
+title: "prctcl"
+author: "Swati"
+date: "24 August 2015"
+output: html_document
+---
+
+```{r cache = TRUE}
+#Loading libraries
+library(e1071)
+library(caret)
+library(tidyr)
+library(dplyr)
+library(leaps)
+
+#Reading training and test data sets
+trainset <- read.csv("pml-training.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+testset <- read.csv("pml-testing.csv", header = TRUE, sep = ",")
+
+#Finding columns which are not having NA entries
+testsetNAcount <- apply(testset, 2, function(x) sum(!is.na(x)))
+testsetNAcount<-as.data.frame(testsetNAcount)
+names(testsetNAcount)<- c("Count")
+testsetNAcount$Col<-rownames(testsetNAcount)
+
+#List of columns with NA entries
+finalcollist <- testsetNAcount[testsetNAcount$Count!=0,2]
+finalcollist <- list(finalcollist)
+
+#Selecting only those columns from trainset which are having non-NA entries
+trainset <- select(trainset, classe, user_name,raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window, roll_belt, pitch_belt, yaw_belt, total_accel_belt, gyros_belt_x, gyros_belt_y,       gyros_belt_z, accel_belt_x, accel_belt_y, accel_belt_z, magnet_belt_x, magnet_belt_y, magnet_belt_z, roll_arm, pitch_arm, yaw_arm, total_accel_arm, gyros_arm_x, gyros_arm_y, gyros_arm_z,       accel_arm_x, accel_arm_y, accel_arm_z, magnet_arm_x, magnet_arm_y, magnet_arm_z, roll_dumbbell,   pitch_dumbbell, yaw_dumbbell, total_accel_dumbbell, gyros_dumbbell_x, gyros_dumbbell_y,    gyros_dumbbell_z, accel_dumbbell_x, accel_dumbbell_y, accel_dumbbell_z, magnet_dumbbell_x, magnet_dumbbell_y, magnet_dumbbell_z, roll_forearm, pitch_forearm, yaw_forearm,     total_accel_forearm, gyros_forearm_x, gyros_forearm_y, gyros_forearm_z, accel_forearm_x,   accel_forearm_y, accel_forearm_z, magnet_forearm_x, magnet_forearm_y, magnet_forearm_z) 
+
+#Data partioning in initial training set with p = 0.7
+inTrain <- createDataPartition(trainset$classe, p = 0.7, list = FALSE)
+training <- trainset[inTrain,]
+testing <- trainset[-inTrain,]
+
+#Cross validating final dimensions of two data sets created from intial trainset with p = 0.7
+dim(training)
+dim(testing)
+
+#Converting class type to date for timestamps columns
+training$cvtd_timestamp <- as.Date(training$cvtd_timestamp)
+training$raw_timestamp_part_1 <- as.Date(as.character(training$raw_timestamp_part_1), "%Y-%m-%d")
+training$raw_timestamp_part_2 <- as.Date(as.character(training$raw_timestamp_part_2), "%Y-%m-%d")
+
+#Converting all columns starting from 7 to numeric as 1 till 6 are character columns.
+for(i in 7:ncol(training)){
+	training[, i] <- as.numeric(unlist(training[,i]))
+}
+training <- training[,-2:-6]
+testing <- testing[,-2:-6]
+
+#Assigning numeric values to classes viz., 1 to A, 2 to B etc.
+training[training$classe == "A",1] <-1
+training[training$classe == "B",1] <-2
+training[training$classe == "C",1] <-3
+training[training$classe == "D",1] <-4
+training[training$classe == "E",1] <-5
+training[training$classe == "F",1] <-6
+testing[testing$classe == "A",1] <-1
+testing[testing$classe == "B",1] <-2
+testing[testing$classe == "C",1] <-3
+testing[testing$classe == "D",1] <-4
+testing[testing$classe == "E",1] <-5
+testing[testing$classe == "F",1] <-6
+
+training$classe <- as.numeric(as.character(training$classe))
+
+#Setting seed
+set.seed(12)
+
+#Modelling using knn method as I have already converted classes into numbers in above steps(1 to A, 2 to B etc.)
+model <- train(data = training, y = training$classe, x = training[,-1], form = classe~., preProcess = "pca", trControl = trainControl(method = "boot", number = 10), method = "knn", allowParallel = TRUE)
+
+#Predicting classes in testing data set using the model developed.
+p <- as.data.frame(predict(model, testing[,-1]))
+print(model)
+```
+
+
